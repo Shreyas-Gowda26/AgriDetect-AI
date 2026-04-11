@@ -1,0 +1,26 @@
+# Environment
+.env
+
+# ML models (large binary files)
+*.pkl
+*.pth
+ml_models/
+
+# Datasets
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
