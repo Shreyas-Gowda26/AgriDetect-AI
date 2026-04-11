@@ -1,5 +1,6 @@
 # Environment
 .env
+.envrc
 
 # ML models (large binary files)
 *.pkl
@@ -13,8 +14,10 @@ ml_models/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 .venv/
 venv/
+env/
 
 # VS Code
 .vscode/
@@ -24,3 +27,16 @@ venv/
 
 # Logs
 *.log
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
