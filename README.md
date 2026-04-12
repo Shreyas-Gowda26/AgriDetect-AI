@@ -1,6 +1,6 @@
 # 🌾 AgriDetect-AI
 
-> AI-powered precision agriculture platform for Indian farmers — crop recommendation, yield prediction, disease detection, and smart irrigation alerts.
+> AI-powered precision agriculture platform for Indian farmers — crop recommendation, yield prediction, disease detection, and smart irrigation alerts!
 
 ---
 
