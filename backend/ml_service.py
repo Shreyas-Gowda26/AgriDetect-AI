@@ -23,38 +23,33 @@ from PIL import Image
 # ─────────────────────────────────────────────────────────────────
 # Paths
 # ─────────────────────────────────────────────────────────────────
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-MODELS_DIR   = os.path.join(BASE_DIR, "ml_models")
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "ml_models")
 
-# Yield model
-YIELD_MODEL_PATH         = os.path.join(MODELS_DIR, "yield_model.pkl")
-ENCODER_CROP_PATH        = os.path.join(MODELS_DIR, "encoder_crop.pkl")
-ENCODER_SEASON_PATH      = os.path.join(MODELS_DIR, "encoder_season.pkl")
-ENCODER_STATE_PATH       = os.path.join(MODELS_DIR, "encoder_state.pkl")
+YIELD_MODEL_PATH      = os.path.join(MODELS_DIR, "yield_model.pkl")
+ENCODER_CROP_PATH     = os.path.join(MODELS_DIR, "encoder_crop.pkl")
+ENCODER_SEASON_PATH   = os.path.join(MODELS_DIR, "encoder_season.pkl")
+ENCODER_STATE_PATH    = os.path.join(MODELS_DIR, "encoder_state.pkl")
 
-# Crop recommendation model
-CROP_REC_MODEL_PATH      = os.path.join(MODELS_DIR, "crop_rec_model.pkl")
-CROP_REC_SCALER_PATH     = os.path.join(MODELS_DIR, "crop_rec_scaler.pkl")
-CROP_REC_ENCODER_PATH    = os.path.join(MODELS_DIR, "crop_rec_label_encoder.pkl")
+CROP_REC_MODEL_PATH   = os.path.join(MODELS_DIR, "crop_rec_model.pkl")
+CROP_REC_SCALER_PATH  = os.path.join(MODELS_DIR, "crop_rec_scaler.pkl")
+CROP_REC_ENCODER_PATH = os.path.join(MODELS_DIR, "crop_rec_label_encoder.pkl")
 
-# Disease detection model
-DISEASE_MODEL_PATH       = os.path.join(MODELS_DIR, "plant_disease_model.pth")
-
+DISEASE_MODEL_PATH    = os.path.join(MODELS_DIR, "plant_disease_model.pth")
 
 # ─────────────────────────────────────────────────────────────────
-# Lazy-loaded model holders (loaded once, reused forever)
+# Lazy-loaded model holders
 # ─────────────────────────────────────────────────────────────────
-_yield_model         = None
-_encoder_crop        = None
-_encoder_season      = None
-_encoder_state       = None
+_yield_model      = None
+_encoder_crop     = None
+_encoder_season   = None
+_encoder_state    = None
 
-_crop_rec_model      = None
-_crop_rec_scaler     = None
-_crop_rec_encoder    = None
+_crop_rec_model   = None
+_crop_rec_scaler  = None
+_crop_rec_encoder = None
 
-_disease_model       = None
-
+_disease_model    = None
 
 # ─────────────────────────────────────────────────────────────────
 # Disease detection constants
@@ -81,6 +76,8 @@ CLASS_NAMES = [
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato___Tomato_mosaic_virus",
     "Tomato___healthy"
 ]
+
+NUM_CLASSES = len(CLASS_NAMES)
 
 DISEASE_RECOMMENDATIONS = {
     "Apple___Apple_scab": {
@@ -284,7 +281,7 @@ _disease_transform = transforms.Compose([
 
 
 # ─────────────────────────────────────────────────────────────────
-# Internal loaders — called once, cached globally
+# Internal loaders
 # ─────────────────────────────────────────────────────────────────
 
 def _load_yield_models():
@@ -308,6 +305,37 @@ def _load_crop_rec_models():
         print("✅ Crop recommendation model loaded.")
 
 
+def _remap_state_dict(state_dict: dict) -> dict:
+    """
+    Remap HuggingFace MobileNetV2 keys to PyTorch torchvision keys.
+    HuggingFace uses 'mobilenet_v2.features.*' naming.
+    PyTorch uses 'features.*' naming.
+    """
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        new_key = key
+        # Remove 'mobilenet_v2.' prefix if present
+        if key.startswith("mobilenet_v2."):
+            new_key = key[len("mobilenet_v2."):]
+        # Map conv_stem → features.0
+        new_key = new_key.replace("conv_stem.first_conv.convolution", "features.0.0")
+        new_key = new_key.replace("conv_stem.first_conv.normalization", "features.0.1")
+        # Map layers → features
+        new_key = new_key.replace("layer.", "features.")
+        # Map conv_pwl/conv_dw/conv_pw patterns
+        new_key = new_key.replace(".conv_pw.convolution", ".conv.0.0")
+        new_key = new_key.replace(".conv_pw.normalization", ".conv.0.1")
+        new_key = new_key.replace(".conv_dw.convolution", ".conv.1.0")
+        new_key = new_key.replace(".conv_dw.normalization", ".conv.1.1")
+        new_key = new_key.replace(".conv_pwl.convolution", ".conv.2")
+        new_key = new_key.replace(".conv_pwl.normalization", ".conv.3")
+        # Map classifier
+        new_key = new_key.replace("classifier.weight", "classifier.1.weight")
+        new_key = new_key.replace("classifier.bias", "classifier.1.bias")
+        new_state_dict[new_key] = value
+    return new_state_dict
+
+
 def _load_disease_model():
     global _disease_model
     if _disease_model is not None:
@@ -318,27 +346,18 @@ def _load_disease_model():
     model.classifier[1] = nn.Linear(model.last_channel, len(CLASS_NAMES))
 
     if not os.path.exists(DISEASE_MODEL_PATH):
-        print("📥 Downloading pretrained weights from HuggingFace (one-time ~50MB)...")
-        try:
-            from huggingface_hub import hf_hub_download
-            import shutil
-            os.makedirs(MODELS_DIR, exist_ok=True)
-            weights_path = hf_hub_download(
-                repo_id="linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification",
-                filename="pytorch_model.bin"
-            )
-            shutil.copy(weights_path, DISEASE_MODEL_PATH)
-            print("✅ Weights downloaded and cached.")
-        except Exception as e:
-            raise RuntimeError(f"Failed to download disease model weights: {e}")
+        raise RuntimeError(
+            f"Model not found at {DISEASE_MODEL_PATH}. "
+            "Please run the training script first."
+        )
 
     state_dict = torch.load(DISEASE_MODEL_PATH, map_location=torch.device("cpu"))
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict)
     model.eval()
+
     _disease_model = model
     print("✅ Plant disease model loaded.")
     return _disease_model
-
 
 # ─────────────────────────────────────────────────────────────────
 # 1. YIELD PREDICTION
@@ -354,72 +373,39 @@ def predict_yield(
     fertilizer: float,
     pesticide: float
 ) -> dict:
-    """
-    Predict crop yield in tons/hectare.
-
-    Args:
-        crop           : Crop name e.g. "Rice"
-        crop_year      : Year e.g. 2024
-        season         : Season e.g. "Kharif", "Rabi", "Whole Year"
-        state          : Indian state e.g. "Karnataka"
-        area           : Area under cultivation in hectares
-        annual_rainfall: Annual rainfall in mm
-        fertilizer     : Fertilizer used in kg
-        pesticide      : Pesticide used in kg
-
-    Returns:
-        { "predicted_yield": float, "unit": "tons/hectare", "input_summary": dict }
-    """
     _load_yield_models()
 
-    # Validate and encode categoricals
     try:
-        crop_enc   = _encoder_crop.transform([crop])[0]
+        crop_enc = _encoder_crop.transform([crop])[0]
     except ValueError:
         raise ValueError(f"Unknown crop '{crop}'. Use /api/yield-options to get valid values.")
-
     try:
         season_enc = _encoder_season.transform([season])[0]
     except ValueError:
         raise ValueError(f"Unknown season '{season}'. Use /api/yield-options to get valid values.")
-
     try:
-        state_enc  = _encoder_state.transform([state])[0]
+        state_enc = _encoder_state.transform([state])[0]
     except ValueError:
         raise ValueError(f"Unknown state '{state}'. Use /api/yield-options to get valid values.")
 
-    features = np.array([[
-        crop_enc,
-        crop_year,
-        season_enc,
-        state_enc,
-        area,
-        annual_rainfall,
-        fertilizer,
-        pesticide
-    ]])
-
+    features  = np.array([[crop_enc, crop_year, season_enc, state_enc,
+                            area, annual_rainfall, fertilizer, pesticide]])
     predicted = float(_yield_model.predict(features)[0])
-    predicted = round(max(predicted, 0), 4)  # no negative yield
+    predicted = round(max(predicted, 0), 4)
 
     return {
         "predicted_yield": predicted,
         "unit": "tons/hectare",
         "input_summary": {
-            "crop": crop,
-            "year": crop_year,
-            "season": season,
-            "state": state,
-            "area_hectares": area,
+            "crop": crop, "year": crop_year, "season": season,
+            "state": state, "area_hectares": area,
             "annual_rainfall_mm": annual_rainfall,
-            "fertilizer_kg": fertilizer,
-            "pesticide_kg": pesticide
+            "fertilizer_kg": fertilizer, "pesticide_kg": pesticide
         }
     }
 
 
 def get_yield_options() -> dict:
-    """Returns valid values for crop, season, and state dropdowns."""
     _load_yield_models()
     return {
         "crops":   sorted(_encoder_crop.classes_.tolist()),
@@ -433,47 +419,23 @@ def get_yield_options() -> dict:
 # ─────────────────────────────────────────────────────────────────
 
 def recommend_crop(
-    N: float,
-    P: float,
-    K: float,
-    temperature: float,
-    humidity: float,
-    ph: float,
-    rainfall: float
+    N: float, P: float, K: float,
+    temperature: float, humidity: float,
+    ph: float, rainfall: float
 ) -> dict:
-    """
-    Recommend the best crop based on soil and weather conditions.
-
-    Args:
-        N           : Nitrogen content in soil (kg/ha)
-        P           : Phosphorus content in soil (kg/ha)
-        K           : Potassium content in soil (kg/ha)
-        temperature : Temperature in Celsius
-        humidity    : Relative humidity in %
-        ph          : Soil pH value
-        rainfall    : Rainfall in mm
-
-    Returns:
-        {
-            "recommended_crop": str,
-            "confidence": float,
-            "top_3": [{ "crop": str, "confidence": float }]
-        }
-    """
     _load_crop_rec_models()
 
-    features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
+    features        = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
     features_scaled = _crop_rec_scaler.transform(features)
-
-    probabilities = _crop_rec_model.predict_proba(features_scaled)[0]
-    top_indices = np.argsort(probabilities)[::-1][:3]
+    probabilities   = _crop_rec_model.predict_proba(features_scaled)[0]
+    top_indices     = np.argsort(probabilities)[::-1][:3]
 
     recommended_crop = _crop_rec_encoder.inverse_transform([top_indices[0]])[0]
-    confidence = round(float(probabilities[top_indices[0]]) * 100, 2)
+    confidence       = round(float(probabilities[top_indices[0]]) * 100, 2)
 
     top_3 = [
         {
-            "crop": _crop_rec_encoder.inverse_transform([idx])[0],
+            "crop":       _crop_rec_encoder.inverse_transform([idx])[0],
             "confidence": round(float(probabilities[idx]) * 100, 2)
         }
         for idx in top_indices
@@ -481,14 +443,14 @@ def recommend_crop(
 
     return {
         "recommended_crop": recommended_crop,
-        "confidence": confidence,
-        "top_3": top_3,
+        "confidence":       confidence,
+        "top_3":            top_3,
         "input_summary": {
             "N": N, "P": P, "K": K,
             "temperature": temperature,
-            "humidity": humidity,
-            "ph": ph,
-            "rainfall": rainfall
+            "humidity":    humidity,
+            "ph":          ph,
+            "rainfall":    rainfall
         }
     }
 
@@ -498,33 +460,12 @@ def recommend_crop(
 # ─────────────────────────────────────────────────────────────────
 
 def detect_disease(image_bytes: bytes) -> dict:
-    """
-    Detect plant disease from a leaf image.
-
-    Args:
-        image_bytes: Raw image bytes from UploadFile.read()
-
-    Returns:
-        {
-            "disease": str,
-            "crop": str,
-            "is_healthy": bool,
-            "confidence": float,
-            "cause": str,
-            "pesticide": str,
-            "dosage": str,
-            "prevention": str,
-            "treatment_timeline": str,
-            "top_3": [{ "disease": str, "confidence": float }]
-        }
-    """
-    model = _load_disease_model()
-
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    model  = _load_disease_model()
+    image  = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     tensor = _disease_transform(image).unsqueeze(0)
 
     with torch.no_grad():
-        outputs = model(tensor)
+        outputs       = model(tensor)
         probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
 
     top_prob, top_idx = torch.topk(probabilities, 3)
@@ -566,7 +507,6 @@ def detect_disease(image_bytes: bytes) -> dict:
 
 
 def get_supported_crops() -> list:
-    """Returns list of crops supported by the disease detection model."""
     crops = set()
     for cls in CLASS_NAMES:
         crop = cls.split("___")[0].replace("_", " ").strip()

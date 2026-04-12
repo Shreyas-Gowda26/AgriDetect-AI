@@ -113,7 +113,7 @@ def _estimate_annual_rainfall(city: str, current_rainfall_mm: float, humidity: f
     # Known annual rainfall averages (mm) for major Indian cities/regions
     CITY_RAINFALL = {
         # Karnataka
-        "mysuru": 786, "mysore": 786, "bangalore": 970, "bengaluru": 970,
+        "mysuru": 65, "mysore": 65, "bangalore": 80, "bengaluru": 80,
         "mangalore": 3500, "hubli": 840, "dharwad": 840, "belgaum": 1100,
         # Maharashtra
         "mumbai": 2167, "pune": 722, "nagpur": 1034, "nashik": 680,
@@ -155,13 +155,13 @@ def _estimate_annual_rainfall(city: str, current_rainfall_mm: float, humidity: f
     # Humidity-based fallback estimate
     # High humidity regions tend to have higher rainfall
     if humidity >= 80:
-        return 1500.0
+        return 125.0
     elif humidity >= 65:
-        return 1000.0
+        return 83.0
     elif humidity >= 50:
-        return 700.0
+        return 58.0
     else:
-        return 400.0
+        return 33.0
 
 
 def _map_city_to_state(city: str) -> str:
