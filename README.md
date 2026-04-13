@@ -233,14 +233,10 @@ One tap → SMS irrigation alert on phone
 
 ## 👥 Team
 
-Built with a team of 4 members 
 
 **Team Predators**
 
 - Shreyas G
-- Shreyas J S
-- Roshan
-- Darshan Kudrigi
 
 ---
 
