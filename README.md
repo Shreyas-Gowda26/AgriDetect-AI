@@ -229,14 +229,6 @@ Farmer can view full history anytime
 One tap → SMS irrigation alert on phone
 ```
 
----
-
-## 👥 Team
-
-
-**Team Predators**
-
-- Shreyas G
 
 ---
 
