@@ -49,7 +49,7 @@ def _build_irrigation_message(
         irrigation_advice = "Light irrigation recommended. Water fields in the evening."
     elif temperature > 30 and humidity < 50:
         irrigation_emoji  = "🚨"
-        irrigation_advice = "Urgent: Heavy irrigation needed! Water fields immediately."
+        irrigation_advice = "Urgent: Heavy irrigation needed! Water fields immediately its urgent."
     else:
         irrigation_emoji  = "💧"
         irrigation_advice = "Moderate irrigation recommended. Best time: early morning."
