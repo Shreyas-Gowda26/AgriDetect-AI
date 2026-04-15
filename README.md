@@ -113,7 +113,7 @@ AgriDetect-AI/
 AUTH
   POST  /api/auth/register
   POST  /api/auth/login
-  GET   /api/auth/me
+  GET   /api/auth/me              <-To get detail of the individual!
 
 SOIL PROFILE
   POST  /api/soil-profile          ← save once after soil testing
