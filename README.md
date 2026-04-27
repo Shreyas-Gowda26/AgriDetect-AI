@@ -58,8 +58,8 @@
 | Weather | OpenWeatherMap API |
 | SMS Alerts | Twilio |
 | Image Storage | Supabase Storage |
-
----
+|Docker 
+--
 
 ## 🤖 ML Models
 
